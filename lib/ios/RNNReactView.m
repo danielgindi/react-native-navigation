@@ -21,11 +21,31 @@
 	
 	RNNReactView* appearedView = notification.object;
 	
-	 if (_reactViewReadyBlock && [appearedView.appProperties[@"componentId"] isEqual:self.appProperties[@"componentId"]]) {
-	 	_reactViewReadyBlock();
-		 _reactViewReadyBlock = nil;
-		 [[NSNotificationCenter defaultCenter] removeObserver:self];
-	 }
+	if (![appearedView.appProperties[@"componentId"] isEqual:_self.appProperties[@"componentId"]])
+	{
+		return;
+	}
+	
+	__weak __typeof(self) _wself = self;
+	
+	// UIManager methods could only be called on the UIManager queue
+	dispatch_async(appearedView.bridge.uiManager.methodQueue, ^{
+		
+		// Make this the first call that happens with the UI on the view that was just added
+		[appearedView.bridge.uiManager prependUIBlock:^(RCTUIManager *uiManager, NSDictionary<NSNumber *,UIView *> *viewRegistry) {
+			
+			__typeof(self) _self = _wself;
+			if (_self == nil) return;
+			
+			if (_reactViewReadyBlock) {
+				_reactViewReadyBlock();
+				_reactViewReadyBlock = nil;
+				[[NSNotificationCenter defaultCenter] removeObserver:self];
+			}
+			
+		}];
+		
+	});
 }
 
 - (void)setRootViewDidChangeIntrinsicSize:(void (^)(CGSize))rootViewDidChangeIntrinsicSize {
